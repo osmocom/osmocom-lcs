@@ -20,6 +20,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+
 #include "gps.h"
 
 
@@ -90,8 +92,10 @@ gps_unpack_sf123(uint32_t *sf, struct gps_ephemeris_sv *eph)
 	eph->aodo	= GET_FIELD_U(sf2[7],  5,  2);
 
 	/* Check & cross-validate iodc[7:0], iode1, iode2 */
-	if ((iode1 != iode2) || (iode1 != (eph->iodc & 0xff)))
+	if ((iode1 != iode2) || (iode1 != (eph->iodc & 0xff))) {
+		fprintf(stderr, "gps_unpack_sf123 failed\n");
 		return -1;
+	}
 
 	return 0;
 }
@@ -106,6 +110,7 @@ gps_unpack_sf123(uint32_t *sf, struct gps_ephemeris_sv *eph)
 int
 gps_unpack_sf45_almanac(uint32_t *sf, struct gps_almanac_sv *alm)
 {
+	/* this is the page ID but not the satellite ID, its wrong in subframe 5 */
 	alm->sv_id      = GET_FIELD_U(sf[0],  6, 16);
 
 	alm->e		= GET_FIELD_U(sf[0], 16,  0);
