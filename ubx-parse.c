@@ -215,6 +215,25 @@ _ubx_msg_parse_aid_eph(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 }
 
 
+static void
+_ubx_msg_parse_nav_timegps(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
+{
+	struct ubx_nav_timegps *nav_timegps = pl;
+	struct gps_assist_data *gps = ud;
+
+	printd1("[.] NAV_TIMEGPS\n");
+
+	/* Extract info for "Reference Time" */
+	gps->fields |= GPS_FIELD_REFTIME;
+
+	gps->ref_time.wn = nav_timegps->week;
+	gps->ref_time.tow = (double)nav_timegps->itow * 1e-3;
+	gps->ref_time.when = time(NULL);
+
+	printd1("  WN   %d\n", nav_timegps->week);
+	printd1("  TOW  %ld\n", nav_timegps->itow);
+}
+
 /* Dispatch table */
 struct ubx_dispatch_entry ubx_parse_dt[] = {
 	UBX_DISPATCH(NAV, POSLLH, _ubx_msg_parse_nav_posllh),
@@ -222,5 +241,6 @@ struct ubx_dispatch_entry ubx_parse_dt[] = {
 	UBX_DISPATCH(AID, HUI, _ubx_msg_parse_aid_hui),
 	UBX_DISPATCH(AID, ALM, _ubx_msg_parse_aid_alm),
 	UBX_DISPATCH(AID, EPH, _ubx_msg_parse_aid_eph),
+	UBX_DISPATCH(NAV, TIMEGPS, _ubx_msg_parse_nav_timegps),
 };
 
