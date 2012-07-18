@@ -142,7 +142,7 @@ struct ubx_hdr {
 
 /* Payload formats (some of them) */
 struct ubx_nav_posllh {
-	uint32_t itow;
+	uint32_t itow; /* ms */
 	int32_t  lon;	/* scaling 1e-7 */
 	int32_t  lat;	/* scaling 1e-7 */
 	int32_t  height;/* mm */
@@ -158,7 +158,7 @@ struct ubx_aid_ini {
 	uint32_t posacc;
 	uint16_t tm_cfg;
 	uint16_t wn;
-	uint32_t tow;
+	uint32_t tow; /* ms */
 	int32_t  tow_ns;
 	uint32_t tacc_ms;
 	uint32_t tacc_ns;
