@@ -27,6 +27,19 @@
 #include "ubx.h"
 #include "ubx-parse.h"
 
+#define DEBUG 1
+#if DEBUG
+	#define printd(x, args ...) printf(x, ## args)
+#else
+	#define printd(x, args ...)
+#endif
+
+#define DEBUG1 0
+#if DEBUG1
+	#define printd1(x, args ...) printf(x, ## args)
+#else
+	#define printd1(x, args ...)
+#endif
 
 /* Helpers */
 
@@ -67,13 +80,18 @@ _ubx_msg_parse_nav_posllh(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	struct ubx_nav_posllh *nav_posllh = pl;
 	struct gps_assist_data *gps = ud;
 
-	//printf("[.] NAV_POSLLH\n");
+	printd("[.] NAV_POSLLH\n");
 
 	gps->fields |= GPS_FIELD_REFPOS;
 
 	gps->ref_pos.latitude  = (double)(nav_posllh->lat) * 1e-7;
 	gps->ref_pos.longitude = (double)(nav_posllh->lon) * 1e-7;
 	gps->ref_pos.altitude  = (double)(nav_posllh->height) * 1e-3;
+	
+	printd("  TOW       %lu\n", nav_posllh->itow);
+	printd("  latitude  %f\n", gps->ref_pos.latitude);
+	printd("  longitude %f\n", gps->ref_pos.longitude);
+	printd("  altitude  %f\n", gps->ref_pos.altitude);
 }
 
 static void
@@ -82,14 +100,22 @@ _ubx_msg_parse_aid_ini(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	struct ubx_aid_ini *aid_ini = pl;
 	struct gps_assist_data *gps = ud;
 
-	//printf("[.] AID_INI\n");
+	printd("[.] AID_INI\n");
 
 	/* Extract info for "Reference Time" */
 	gps->fields |= GPS_FIELD_REFTIME;
 
 	gps->ref_time.wn = aid_ini->wn;
 	gps->ref_time.tow = (double)aid_ini->tow * 1e-3;
-
+	gps->ref_time.when = time(NULL);
+	
+	printd("  WN   %d\n", gps->ref_time.wn);
+	printd("  TOW  %ld\n", aid_ini->tow);
+		
+	if((aid_ini->flags & 0x03) != 0x03) { /* time and pos valid ? */
+		fprintf(stderr, "Postion and/or time not valid (0x%lx)", aid_ini->flags);
+	}
+	
 	// FIXME: We could extract ref position as well but we need it in
 	//        WGS84 geodetic coordinates and it's provided as ecef, so
 	//        we need a lot of math ...
@@ -101,11 +127,13 @@ _ubx_msg_parse_aid_hui(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	struct ubx_aid_hui *aid_hui = pl;
 	struct gps_assist_data *gps = ud;
 
-	//printf("[.] AID_HUI\n");
+	printd("[.] AID_HUI\n");
 
 	if (aid_hui->flags & 0x2) { /* UTC parameters valid */
 		struct gps_utc_model *utc = &gps->utc;
 
+		printd("  UTC\n");
+		
 		gps->fields |= GPS_FIELD_UTC;
 
 		utc->a0          = double_to_fixedpoint(aid_hui->utc_a0, -30);
@@ -121,6 +149,8 @@ _ubx_msg_parse_aid_hui(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	if (aid_hui->flags & 0x04) { /* Klobuchar parameters valid */
 		struct gps_ionosphere_model *iono = &gps->ionosphere;
 
+		printd("  IONOSPHERE\n");
+		
 		gps->fields |= GPS_FIELD_IONOSPHERE;
 
 		iono->alpha_0 = float_to_fixedpoint(aid_hui->klob_a0, -30);
@@ -140,12 +170,23 @@ _ubx_msg_parse_aid_alm(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	struct ubx_aid_alm *aid_alm = pl;
 	struct gps_assist_data *gps = ud;
 
-	//printf("[.] AID_ALM %d - %d\n", aid_alm->sv_id, aid_alm->gps_week);
+	if(pl_len == 8) /* length if not available */
+		return;
+		
+	if(pl_len != sizeof(struct ubx_aid_alm)) {
+		fprintf(stderr, "pl_len != sizeof(struct ubx_aid_alm) (%d)\n", pl_len);
+		return;
+	}
+	
+	printd("[.] AID_ALM %2ld - %ld (nsv = %d)\n", aid_alm->sv_id, aid_alm->gps_week, gps->almanac.n_sv);
 
 	if (aid_alm->gps_week) {
+		int i = gps->almanac.n_sv++;
 		gps->fields |= GPS_FIELD_ALMANAC;
 		gps->almanac.wna = aid_alm->gps_week & 0xff;
-		gps_unpack_sf45_almanac(aid_alm->alm_words, &gps->almanac.svs[gps->almanac.n_sv++]);
+		gps_unpack_sf45_almanac(aid_alm->alm_words, &gps->almanac.svs[i]);
+		/* set satellite ID this way, otherwise it will be wrong */
+		gps->almanac.svs[i].sv_id = aid_alm->sv_id;
 	}
 }
 
@@ -155,7 +196,15 @@ _ubx_msg_parse_aid_eph(struct ubx_hdr *hdr, void *pl, int pl_len, void *ud)
 	struct ubx_aid_eph *aid_eph = pl;
 	struct gps_assist_data *gps = ud;
 
-	//printf("[.] AID_EPH %d - %s\n", aid_eph->sv_id, aid_eph->present ? "present" : "not present");
+	if(pl_len == 8) /* length if not available */
+		return;
+	
+	if(pl_len != sizeof(struct ubx_aid_eph)) {
+		fprintf(stderr, "pl_len != sizeof(struct ubx_aid_eph) (%d)\n", pl_len);
+		return;
+	}
+	
+	printd("[.] AID_EPH %2ld - %s (nsv = %d)\n", aid_eph->sv_id, aid_eph->present ? "present" : "", gps->ephemeris.n_sv);
 
 	if (aid_eph->present) {
 		int i = gps->ephemeris.n_sv++;
