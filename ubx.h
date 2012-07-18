@@ -201,6 +201,14 @@ struct ubx_aid_eph {
 	uint32_t eph_words[24];	/* Present only if 'present' != 0 */
 } __attribute__((packed));
 
+struct ubx_nav_timegps {
+	uint32_t itow;	/* ms */
+	int32_t  ftow;	/* ns */
+	int16_t  week;
+	uint8_t  leaps;
+	uint8_t  valid;
+	uint32_t tacc;	/* ns */
+} __attribute__((packed));
 
 /* Message handler */
 typedef void (*ubx_msg_handler_t)(
