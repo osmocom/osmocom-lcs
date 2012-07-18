@@ -1,0 +1,46 @@
+RRLP Server
+------------
+
+- Adjust ASN1C paths in the makefile (maybe adjust the makefile too)
+
+- ** VERY IMPORTANT **: apply ASN1C patch, otherwise invalid PDUs will 
+  be generated
+  
+- Patches for OpenBSC are "TODO"
+
+- Adjust IP Address of RRLP Server in OpenBSC rrlp.c (TODO: ajust code to
+  get this setting from config file)
+  
+- Requires a u-Blox GPS receiver. The receiver is supposed to be connected
+  over its USB port. Some changes are problably required if the reciver is 
+  connected through its UART port (see "#define GPS_USB ..." in main.c)
+
+- To work properly, the GPS receiver should already have a GPS fix
+
+- Enable RRLP in OpenBSC config file ("rrlp mode ms-based")
+
+- How to run:  (Parameter: interface IP Address where to listen, 
+  GPS receiver port), e.g.:
+
+      ./rrlp-serv 192.168.1.1 /dev/ttyS0
+
+      
+Issues:
+
+  - "Work in Progress": code not yet properly organized and cleaned up
+  
+  - very verbose output for debugging/testing
+  
+  - rrlp.c: find out if data channel is slow (SDCCH) so that long assistance
+    data will not be sent
+    
+  - send an RRLP request not just when paging a phone
+  
+  - paging: sometimes no RRLP response is reveicved !?
+  
+  - Location update: response of the phone got lost, channel is closed too
+    early !?
+  
+  - GPS reference time: do we need an offset so that the time is correct when
+    the phone receives it ?
+        
