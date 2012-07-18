@@ -60,8 +60,23 @@ ubx_msg_dispatch(struct ubx_dispatch_entry *dt,
 	uint8_t cksum[2], *cksum_ptr;
 	ubx_msg_handler_t h;
 
+	if (len < 2) {
+		fprintf(stderr, "[!] Length too small (%d)\n", len);
+		return -1;
+	}
+
 	if ((hdr->sync[0] != UBX_SYNC0) || (hdr->sync[1] != UBX_SYNC1)) {
 		fprintf(stderr, "[!] Invalid sync bytes\n");
+		return -1;
+	}
+
+	if (len < sizeof(struct ubx_hdr)) {
+		fprintf(stderr, "[!] Length too small for UBX header (%d)\n", len);
+		return -1;
+	}
+
+	if (len < sizeof(struct ubx_hdr) + hdr->payload_len - 2) {
+		fprintf(stderr, "[!] Length too small for UBX header and payload (%d)\n", len);
 		return -1;
 	}
 
